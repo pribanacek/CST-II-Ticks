@@ -13,7 +13,7 @@ in vec3 pos;
 out vec3 color;
 
 #define PI 3.1415926535897932384626433832795
-#define RENDER_DEPTH 80
+#define RENDER_DEPTH 800
 #define CLOSE_ENOUGH 0.00001
 
 #define BACKGROUND -1
@@ -24,6 +24,11 @@ out vec3 color;
     func(vec3(pt.x + 0.0001, pt.y, pt.z)) - func(vec3(pt.x - 0.0001, pt.y, pt.z)), \
     func(vec3(pt.x, pt.y + 0.0001, pt.z)) - func(vec3(pt.x, pt.y - 0.0001, pt.z)), \
     func(vec3(pt.x, pt.y, pt.z + 0.0001)) - func(vec3(pt.x, pt.y, pt.z - 0.0001)))
+
+#define GREEN vec3(0.4, 1, 0.4)
+#define BLUE vec3(0.4, 0.4, 1)
+#define BLACK vec3(0, 0, 0)
+
 
 const vec3 LIGHT_POS[] = vec3[](vec3(5, 18, 10));
 
@@ -73,12 +78,21 @@ float getSdf(vec3 p) {
     return minimum;
 }
 
+float getPlaneSdf(vec3 p) {
+    return p.y + 1;
+}
+
 vec3 getNormal(vec3 pt) {
   return normalize(GRADIENT(pt, getSdf));
 }
 
 vec3 getColor(vec3 pt) {
   return vec3(1);
+}
+
+vec3 getPlaneColor(vec3 pt) {
+    float d = mod(getSdf(pt), 5.25);
+    return d > 5 ? BLACK : mix(GREEN, BLUE, mod(d, 1));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -97,8 +111,14 @@ float shade(vec3 eye, vec3 pt, vec3 n) {
 
 vec3 illuminate(vec3 camPos, vec3 rayDir, vec3 pt) {
   vec3 c, n;
-  n = getNormal(pt);
-  c = getColor(pt);
+  bool isPlane = abs(getPlaneSdf(pt)) <= CLOSE_ENOUGH;
+  if (isPlane) {
+    n = vec3(0, 1, 0);
+    c = getPlaneColor(pt);
+  } else {
+    n = getNormal(pt);
+    c = getColor(pt);
+  }
   return shade(camPos, pt, n) * c;
 }
 
@@ -109,7 +129,8 @@ vec3 raymarch(vec3 camPos, vec3 rayDir) {
   float t = 0;
 
   for (float d = 1000; step < RENDER_DEPTH && abs(d) > CLOSE_ENOUGH; t += abs(d)) {
-    d = getSdf(camPos + t * rayDir);
+    vec3 pos = camPos + t * rayDir;
+    d = min(getPlaneSdf(pos), getSdf(pos));
     step++;
   }
 
