@@ -13,7 +13,7 @@ in vec3 pos;
 out vec3 color;
 
 #define PI 3.1415926535897932384626433832795
-#define RENDER_DEPTH 50
+#define RENDER_DEPTH 800
 #define CLOSE_ENOUGH 0.00001
 
 #define BACKGROUND -1
@@ -43,12 +43,17 @@ vec3 getRayDir() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+float cube(vec3 p) {
+    vec3 d = abs(p) - vec3(1);
+    return min(max(d.x, max(d.y, d.z)), 0.0) + length(max(d, 0.0));
+}
+
 float sphere(vec3 pt) {
   return length(pt) - 1;
 }
 
 vec3 getNormal(vec3 pt) {
-  return normalize(GRADIENT(pt, sphere));
+  return normalize(GRADIENT(pt, cube));
 }
 
 vec3 getColor(vec3 pt) {
@@ -83,7 +88,7 @@ vec3 raymarch(vec3 camPos, vec3 rayDir) {
   float t = 0;
 
   for (float d = 1000; step < RENDER_DEPTH && abs(d) > CLOSE_ENOUGH; t += abs(d)) {
-//    d = sphere(camPos + t * rayDir);
+    d = cube(camPos + t * rayDir);
     step++;
   }
 
