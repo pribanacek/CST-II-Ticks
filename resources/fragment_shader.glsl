@@ -13,7 +13,7 @@ in vec3 pos;
 out vec3 color;
 
 #define PI 3.1415926535897932384626433832795
-#define RENDER_DEPTH 800
+#define RENDER_DEPTH 80
 #define CLOSE_ENOUGH 0.00001
 
 #define BACKGROUND -1
@@ -52,8 +52,29 @@ float sphere(vec3 pt) {
   return length(pt) - 1;
 }
 
+float smin(float a, float b) {
+    float k = 0.2;
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0, 1);
+    return mix(b, a, h) - k * h * (1 - h);
+}
+
+float getSdf(vec3 p) {
+    float objects[4];
+    vec3 positions[4] = vec3[4](vec3(-3, 0, -3), vec3(3, 0, 3), vec3(-3, 0, 3), vec3(3, 0, -3));
+    objects[0] = min(cube(p - positions[0]), sphere(p - positions[0] - vec3(1, 0, 1)));
+    objects[1] = max(cube(p - positions[1]), sphere(p - positions[1] - vec3(1, 0, 1)));
+    objects[2] = smin(cube(p - positions[2]), sphere(p - positions[2] - vec3(1, 0, 1)));
+    objects[3] = max(cube(p - positions[3]), -sphere(p - positions[3] - vec3(1, 0, 1)));
+
+    float minimum = RENDER_DEPTH;
+    for (int i = 0; i < objects.length(); i++) {
+        minimum = min(minimum, objects[i]);
+    }
+    return minimum;
+}
+
 vec3 getNormal(vec3 pt) {
-  return normalize(GRADIENT(pt, cube));
+  return normalize(GRADIENT(pt, getSdf));
 }
 
 vec3 getColor(vec3 pt) {
@@ -64,11 +85,11 @@ vec3 getColor(vec3 pt) {
 
 float shade(vec3 eye, vec3 pt, vec3 n) {
   float val = 0;
-  
+
   val += 0.1;  // Ambient
-  
+
   for (int i = 0; i < LIGHT_POS.length(); i++) {
-    vec3 l = normalize(LIGHT_POS[i] - pt); 
+    vec3 l = normalize(LIGHT_POS[i] - pt);
     val += max(dot(n, l), 0);
   }
   return val;
@@ -88,7 +109,7 @@ vec3 raymarch(vec3 camPos, vec3 rayDir) {
   float t = 0;
 
   for (float d = 1000; step < RENDER_DEPTH && abs(d) > CLOSE_ENOUGH; t += abs(d)) {
-    d = cube(camPos + t * rayDir);
+    d = getSdf(camPos + t * rayDir);
     step++;
   }
 
