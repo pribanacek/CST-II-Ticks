@@ -48,25 +48,13 @@ vec3 getRayDir() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-float cube(vec3 p) {
-    vec3 d = abs(p) - vec3(1);
+float cube(vec3 p, float r) {
+    vec3 d = abs(p) - vec3(r);
     return min(max(d.x, max(d.y, d.z)), 0.0) + length(max(d, 0.0));
 }
 
-float sphere(vec3 pt) {
-  return length(pt) - 1;
-}
-
-float torusXZ(vec3 p) {
-    float r1 = 3.0;
-    float r2 = 1.0;
-    return sqrt(pow(sqrt(p.x * p.x + p.z * p.z) - r1, 2) + p.y * p.y) - r2;
-}
-
-float torusXY(vec3 p) {
-    float r1 = 3.0;
-    float r2 = 1.0;
-    return sqrt(pow(sqrt(p.x * p.x + p.y * p.y) - r1, 2) + p.z * p.z) - r2;
+float sphere(vec3 pt, float radius) {
+  return length(pt) - radius;
 }
 
 float smin(float a, float b) {
@@ -75,8 +63,45 @@ float smin(float a, float b) {
     return mix(b, a, h) - k * h * (1 - h);
 }
 
+float twistedColumn(vec3 pt) {
+    float t = pt.y * PI / 8;
+    return cube(vec3(
+    pt.x * cos(t) + pt.z * sin(t),
+    pt.y / 4,
+    -pt.x * sin(t) + pt.z * cos(t)), 1) / 4;
+}
+
+float taperedTwist(vec3 pt) {
+    pt.x *= (pt.y + 3);
+    pt.z *= (pt.y + 3);
+    return twistedColumn(pt);
+}
+
+float tetrahedron(vec3 p) {
+    return (max(abs(p.x + p.y) - p.z, abs(p.x - p.y) + p.z) - 1) / 3;
+}
+
+float getColumnSdf(vec3 p) {
+    float column = taperedTwist(p) / 4;
+    float ball = sphere(p - vec3(0, 4, 0), 0.425);
+    return min(ball, column);
+}
+
+float getRepeatedColumns(vec3 p) {
+    float n = 7;
+    float offset = 5;
+
+    float d = RENDER_DEPTH;
+    for (float i = -floor(n / 2); i < ceil(n / 2); i++) {
+        float col1 = getColumnSdf(p - vec3(i * offset, 0, 6));
+        float col2 = getColumnSdf(p - vec3(i * offset, 0, -6));
+        d = min(d, min(col1, col2));
+    }
+    return d;
+}
+
 float getSdf(vec3 p) {
-    return torusXY(p - vec3(0, 3, 0));
+    return min(getRepeatedColumns(p), tetrahedron(vec3(p.x / 12, p.y / 4, p.z / 4)));
 }
 
 float getPlaneSdf(vec3 p) {
@@ -127,7 +152,7 @@ float shade(vec3 eye, vec3 pt, vec3 n) {
 
   for (int i = 0; i < LIGHT_POS.length(); i++) {
     vec3 l = normalize(LIGHT_POS[i] - pt);
-    float k_shadow = shadow(pt, LIGHT_POS[i]);
+    float k_shadow = 1.0; // shadow(pt, LIGHT_POS[i]);
     float diffuse = k_d * max(dot(n, l), 0) * k_shadow;
 
     vec3 r = reflect(l, n);
