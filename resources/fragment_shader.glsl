@@ -57,6 +57,12 @@ float sphere(vec3 pt) {
   return length(pt) - 1;
 }
 
+float torusXZ(vec3 p) {
+    float r1 = 3.0;
+    float r2 = 1.0;
+    return sqrt(pow(sqrt(p.x * p.x + p.z * p.z) - r1, 2) + p.y * p.y) - r2;
+}
+
 float smin(float a, float b) {
     float k = 0.2;
     float h = clamp(0.5 + 0.5 * (b - a) / k, 0, 1);
@@ -64,22 +70,15 @@ float smin(float a, float b) {
 }
 
 float getSdf(vec3 p) {
-    float objects[4];
-    vec3 positions[4] = vec3[4](vec3(-3, 0, -3), vec3(3, 0, 3), vec3(-3, 0, 3), vec3(3, 0, -3));
-    objects[0] = min(cube(p - positions[0]), sphere(p - positions[0] - vec3(1, 0, 1)));
-    objects[1] = max(cube(p - positions[1]), sphere(p - positions[1] - vec3(1, 0, 1)));
-    objects[2] = smin(cube(p - positions[2]), sphere(p - positions[2] - vec3(1, 0, 1)));
-    objects[3] = max(cube(p - positions[3]), -sphere(p - positions[3] - vec3(1, 0, 1)));
-
-    float minimum = RENDER_DEPTH;
-    for (int i = 0; i < objects.length(); i++) {
-        minimum = min(minimum, objects[i]);
-    }
-    return minimum;
+    return torusXZ(p - vec3(0, 3, 0));
 }
 
 float getPlaneSdf(vec3 p) {
     return p.y + 1;
+}
+
+vec3 getPlaneNormal(vec3 pt) {
+  return normalize(GRADIENT(pt, getPlaneSdf));
 }
 
 vec3 getNormal(vec3 pt) {
@@ -92,19 +91,26 @@ vec3 getColor(vec3 pt) {
 
 vec3 getPlaneColor(vec3 pt) {
     float d = mod(getSdf(pt), 5.25);
-    return d > 5 ? BLACK : mix(GREEN, BLUE, mod(d, 1));
+    return d >= 5 ? BLACK : mix(GREEN, BLUE, mod(d, 1));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 float shade(vec3 eye, vec3 pt, vec3 n) {
   float val = 0;
+  float k_a = 0.1, k_d = 1.0, k_s = 1.0, alpha = 256;
 
-  val += 0.1;  // Ambient
+  val += k_a;  // Ambient
 
   for (int i = 0; i < LIGHT_POS.length(); i++) {
     vec3 l = normalize(LIGHT_POS[i] - pt);
-    val += max(dot(n, l), 0);
+    float diffuse = k_d * max(dot(n, l), 0);
+
+    vec3 r = reflect(l, n);
+    vec3 v = normalize(eye);
+    float specular = k_s * pow(max(-dot(r, v), 0), alpha);
+
+    val += specular + diffuse;
   }
   return val;
 }
@@ -113,7 +119,7 @@ vec3 illuminate(vec3 camPos, vec3 rayDir, vec3 pt) {
   vec3 c, n;
   bool isPlane = abs(getPlaneSdf(pt)) <= CLOSE_ENOUGH;
   if (isPlane) {
-    n = vec3(0, 1, 0);
+    n = getPlaneNormal(pt);
     c = getPlaneColor(pt);
   } else {
     n = getNormal(pt);
