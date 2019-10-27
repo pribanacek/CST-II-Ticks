@@ -121,8 +121,8 @@ vec3 getColor(vec3 pt) {
 }
 
 vec3 getPlaneColor(vec3 pt) {
-    float d = mod(getSdf(pt), 5.25);
-    return d >= 5 ? BLACK : mix(GREEN, BLUE, mod(d, 1));
+    float d = mod(getSdf(pt), 5);
+    return d >= 4.75 ? BLACK : mix(GREEN, BLUE, mod(d, 1));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
