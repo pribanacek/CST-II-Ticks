@@ -63,6 +63,12 @@ float torusXZ(vec3 p) {
     return sqrt(pow(sqrt(p.x * p.x + p.z * p.z) - r1, 2) + p.y * p.y) - r2;
 }
 
+float torusXY(vec3 p) {
+    float r1 = 3.0;
+    float r2 = 1.0;
+    return sqrt(pow(sqrt(p.x * p.x + p.y * p.y) - r1, 2) + p.z * p.z) - r2;
+}
+
 float smin(float a, float b) {
     float k = 0.2;
     float h = clamp(0.5 + 0.5 * (b - a) / k, 0, 1);
@@ -70,7 +76,7 @@ float smin(float a, float b) {
 }
 
 float getSdf(vec3 p) {
-    return torusXZ(p - vec3(0, 3, 0));
+    return torusXY(p - vec3(0, 3, 0));
 }
 
 float getPlaneSdf(vec3 p) {
@@ -96,6 +102,23 @@ vec3 getPlaneColor(vec3 pt) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+float shadow(vec3 pt, vec3 lightPos) {
+    vec3 lightDir = normalize(lightPos - pt);
+    float kd = 1.0;
+    int step = 0;
+    for (float t = 0.1; t < length(lightPos - pt) && step < RENDER_DEPTH && kd > CLOSE_ENOUGH; ) {
+        float d = abs(getSdf(pt + t * lightDir));
+        if (d < CLOSE_ENOUGH) {
+            kd = 0;
+        } else {
+            kd = min(kd, 16 * d / t);
+        }
+        t += d;
+        step++;
+    }
+    return kd;
+}
+
 float shade(vec3 eye, vec3 pt, vec3 n) {
   float val = 0;
   float k_a = 0.1, k_d = 1.0, k_s = 1.0, alpha = 256;
@@ -104,11 +127,12 @@ float shade(vec3 eye, vec3 pt, vec3 n) {
 
   for (int i = 0; i < LIGHT_POS.length(); i++) {
     vec3 l = normalize(LIGHT_POS[i] - pt);
-    float diffuse = k_d * max(dot(n, l), 0);
+    float k_shadow = shadow(pt, LIGHT_POS[i]);
+    float diffuse = k_d * max(dot(n, l), 0) * k_shadow;
 
     vec3 r = reflect(l, n);
     vec3 v = normalize(eye);
-    float specular = k_s * pow(max(-dot(r, v), 0), alpha);
+    float specular = k_s * pow(max(-dot(r, v), 0), alpha) * k_shadow;
 
     val += specular + diffuse;
   }
