@@ -156,7 +156,7 @@ float shade(vec3 eye, vec3 pt, vec3 n) {
     float diffuse = k_d * max(dot(n, l), 0) * k_shadow;
 
     vec3 r = reflect(l, n);
-    vec3 v = normalize(eye);
+    vec3 v = normalize(eye - pt);
     float specular = k_s * pow(max(-dot(r, v), 0), alpha) * k_shadow;
 
     val += specular + diffuse;
